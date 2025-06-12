@@ -10,16 +10,60 @@ import { Calendar, Download, Send } from "lucide-react"
 export default function CtaSection() {
   const [email, setEmail] = useState("")
   const [submitted, setSubmitted] = useState(false)
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (email) {
-      // Here you would normally send the email to your backend
-      setSubmitted(true)
+  const validateEmail = (email: string): boolean => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Client-side validation
+    if (!email) {
+      setError('Email is required');
+      return;
+    }
+    
+    if (!validateEmail(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/send-deck', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to send request');
+      }
+      
+      setSubmitted(true);
+      setEmail('');
+      
+      // Reset the submitted state after 5 seconds
       setTimeout(() => {
-        setSubmitted(false)
-        setEmail("")
-      }, 3000)
+        setSubmitted(false);
+      }, 5000);
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send request. Please try again later.';
+      setError(errorMessage);
+      console.error('Error sending email:', err);
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -66,10 +110,25 @@ export default function CtaSection() {
                     required
                   />
                 </div>
-                <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                  {submitted ? "Deck Requested!" : "Request Deck"}
-                  <Send className="ml-2 h-4 w-4" />
+                <Button 
+                  type="submit" 
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={isLoading || submitted}
+                >
+                  {isLoading ? (
+                    'Sending...'
+                  ) : submitted ? (
+                    'Deck Requested!'
+                  ) : (
+                    <>
+                      Request Deck
+                      <Send className="ml-2 h-4 w-4" />
+                    </>
+                  )}
                 </Button>
+                {error && (
+                  <p className="text-red-400 text-sm mt-2">{error}</p>
+                )}
               </form>
             </div>
 
